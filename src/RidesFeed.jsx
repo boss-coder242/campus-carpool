@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { CAMPUS_LOCATIONS } from "./locations";
+import UserProfile from "./UserProfile";
 
 export default function RidesFeed() {
   const [rides, setRides] = useState([]);
@@ -12,6 +13,7 @@ export default function RidesFeed() {
   const [isFemale, setIsFemale] = useState(false);
   const [femaleFilter, setFemaleFilter] = useState(false);
   const [filter, setFilter] = useState({ from: "", to: "", date: "" });
+  const [viewUser, setViewUser] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -34,6 +36,7 @@ export default function RidesFeed() {
       .from("rides")
       .select(`
         id, from, to, date, time, seats_left, seats_total, price, note, status, women_only,
+        car_model, car_color,
         driver:public_profiles!driver_id (id, name, branch, year, rating_avg, rating_count)
       `)
       .eq("status", "open")
@@ -167,12 +170,20 @@ export default function RidesFeed() {
                 {r.women_only && <span className="rf-wo">♀ Women only</span>}
               </div>
 
+              {(r.car_model || r.car_color) && (
+                <div className="rf-car">
+                  <span className="rf-car-i">🚗</span>
+                  {[r.car_model, r.car_color].filter(Boolean).join(" · ")}
+                </div>
+              )}
+
               {r.note && <p className="rf-note">{r.note}</p>}
 
               <div className="rf-foot">
-                <div className="rf-driver">
+                <button className="rf-driver" title="View profile"
+                  onClick={() => r.driver?.id && setViewUser(r.driver.id)}>
                   <span className="rf-avatar">{r.driver?.name?.[0] ?? "?"}</span>
-                  <div>
+                  <div className="rf-driver-txt">
                     <div className="rf-name">{r.driver?.name ?? "Student"}</div>
                     <div className="rf-dim rf-small">
                       {r.driver?.branch} · Year {r.driver?.year}
@@ -180,7 +191,7 @@ export default function RidesFeed() {
                         ` · ★ ${Number(r.driver.rating_avg).toFixed(1)}`}
                     </div>
                   </div>
-                </div>
+                </button>
 
                 <div className="rf-actions">
                   <div className="rf-price">₹{Number(r.price).toFixed(0)}</div>
@@ -206,6 +217,8 @@ export default function RidesFeed() {
           );
         })}
       </ul>
+
+      {viewUser && <UserProfile userId={viewUser} onClose={() => setViewUser(null)} />}
     </div>
   );
 }
@@ -245,7 +258,12 @@ const css = `
 .rf-note{font-size:13.5px;color:#c2d2c8;margin:10px 0 0;line-height:1.45}
 .rf-foot{display:flex;justify-content:space-between;align-items:flex-end;
   margin-top:16px;padding-top:14px;border-top:1px solid #24332b;gap:12px}
-.rf-driver{display:flex;align-items:center;gap:10px;min-width:0}
+.rf-driver{display:flex;align-items:center;gap:10px;min-width:0;background:none;border:0;
+  padding:0;cursor:pointer;text-align:left;color:inherit;font:inherit;border-radius:8px}
+.rf-driver:hover .rf-name{color:#5fd08a;text-decoration:underline}
+.rf-driver-txt{min-width:0}
+.rf-car{display:flex;align-items:center;gap:6px;margin-top:9px;font-size:12.5px;color:#c2d2c8}
+.rf-car-i{font-size:13px}
 .rf-avatar{width:34px;height:34px;border-radius:50%;background:#24382c;color:#9fd8b4;
   display:grid;place-items:center;font-weight:650;flex:none}
 .rf-name{font-size:14px;font-weight:550}

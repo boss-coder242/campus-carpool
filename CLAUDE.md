@@ -39,6 +39,8 @@ mirrored in `supabase/migrations/`. Run in order:
 | `06_reports_table_and_rls` | reports table, insert-own / select-own RLS |
 | `07_gender_and_women_only` | users.gender, rides.women_only, women-only enforcement |
 | `08_ride_contacts_rpc` | get_ride_contacts RPC — scoped phone reveal to co-riders |
+| `09_ride_requests_and_rls` | ride_requests table + RLS — **written, not wired to UI yet** |
+| `10_vehicle_and_public_profile` | rides.car_model/car_color, public_profiles.created_at |
 | `99_scratch_debug` | throwaway queries — reuse, never rename |
 
 ### Schema
@@ -48,7 +50,7 @@ users             id, email, phone, name, branch, year, gender,
                   rating_avg, rating_count, created_at
 rides             id, driver_id, "from", "to", date, time,
                   seats_total, seats_left, price, note, status,
-                  women_only, created_at
+                  women_only, car_model, car_color, created_at
 ride_passengers   id, ride_id, user_id, joined_at, left_at
 ratings           id, ride_id, rater_id, rated_id, stars, created_at
 reports           id, reporter_id, reported_id, reason, ride_id, created_at
@@ -97,7 +99,9 @@ src/
   supabaseClient.js   Supabase client + isAllowedEmail() + ALLOWED_DOMAIN
   AuthFlow.jsx        3-step auth gate, wraps the app
   App.jsx             <AuthFlow><Shell/></AuthFlow> — bottom tab-bar shell
-  RidesFeed.jsx       browse open rides, join/leave (Rides tab)
+  RidesFeed.jsx       browse open rides, search/filter, join/leave (Rides tab)
+  UserProfile.jsx     tappable public profile modal (reads public_profiles only)
+  locations.js        CAMPUS_LOCATIONS presets for datalist autocomplete
   PostRide.jsx        post-a-ride form, inserts into rides (Post tab)
   MyRides.jsx         driving + riding, cancel/complete/leave, rate, report
   Profile.jsx         view/edit own profile + rating, sign out

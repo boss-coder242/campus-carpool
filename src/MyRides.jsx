@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import UserProfile from "./UserProfile";
 
 /*
   My Rides — two lenses on the same person:
@@ -73,6 +74,7 @@ export default function MyRides() {
   const [report, setReport] = useState(null); // { id, name, rideId }
   const [contacts, setContacts] = useState({}); // rideId -> [{id,name,phone,role}]
   const [openC, setOpenC] = useState(new Set()); // rideIds with contacts revealed
+  const [viewUser, setViewUser] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -229,7 +231,10 @@ export default function MyRides() {
                 <>
                   <div className="mr-pax">
                     {active.length === 0 ? <span className="mr-dim">No passengers yet.</span>
-                      : active.map((p) => <span key={p.user_id} className="mr-chip">{name(p.user_id)}</span>)}
+                      : active.map((p) => (
+                        <button key={p.user_id} className="mr-chip" title="View profile"
+                          onClick={() => setViewUser(p.user_id)}>{name(p.user_id)}</button>
+                      ))}
                   </div>
                   <div className="mr-actions">
                     <button className="mr-btn" disabled={busyKey === "done" + r.id}
@@ -247,10 +252,10 @@ export default function MyRides() {
                       const done = rated.has(`${r.id}|${p.user_id}`);
                       return (
                         <div key={p.user_id} className="mr-rate-row">
-                          <div>
+                          <button className="mr-person" onClick={() => setViewUser(p.user_id)} title="View profile">
                             <div className="mr-name">{name(p.user_id)}</div>
                             <div className="mr-dim mr-small">{meta(p.user_id)}</div>
-                          </div>
+                          </button>
                           {done ? <span className="mr-tag">Rated</span>
                             : <Stars busy={busyKey === "rate" + r.id + p.user_id}
                                 onRate={(s) => rate(r.id, p.user_id, s)} />}
@@ -295,11 +300,15 @@ export default function MyRides() {
               <div className="mr-when">{fmtDate(r.date)} · {fmtTime(r.time)} · ₹{Number(r.price).toFixed(0)}
                 {r.women_only && <span className="mr-wo">♀ Women only</span>}</div>
 
+              {(r.car_model || r.car_color) && (
+                <div className="mr-car">🚗 {[r.car_model, r.car_color].filter(Boolean).join(" · ")}</div>
+              )}
+
               <div className="mr-rate-row">
-                <div>
+                <button className="mr-person" onClick={() => setViewUser(drv)} title="View profile">
                   <div className="mr-name">{name(drv)}</div>
                   <div className="mr-dim mr-small">{meta(drv)} · driver</div>
-                </div>
+                </button>
                 <div className="mr-inline-actions">
                   {!left && (r.status === "open" || r.status === "full") && (
                     <button className="mr-btn ghost sm" disabled={busyKey === "leave" + r.id}
@@ -334,6 +343,8 @@ export default function MyRides() {
         <ReportModal name={report.name} busy={busyKey === "report"}
           onClose={() => setReport(null)} onSubmit={submitReport} />
       )}
+
+      {viewUser && <UserProfile userId={viewUser} onClose={() => setViewUser(null)} />}
     </div>
   );
 }
@@ -383,7 +394,12 @@ const css = `
 .s-cancelled{background:#331a1a;color:#e08a8a;border:1px solid #4a2e2e}
 .mr-pax{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .mr-chip{font-size:12px;background:#1f2e25;border:1px solid #2e4a38;color:#c2d2c8;
-  border-radius:20px;padding:4px 10px}
+  border-radius:20px;padding:4px 10px;cursor:pointer;font-family:inherit}
+.mr-chip:hover{border-color:#5fd08a;color:#9fd8b4}
+.mr-person{background:none;border:0;padding:0;text-align:left;cursor:pointer;
+  color:inherit;font:inherit;min-width:0}
+.mr-person:hover .mr-name{color:#5fd08a;text-decoration:underline}
+.mr-car{margin-top:9px;font-size:12.5px;color:#c2d2c8}
 .mr-actions{display:flex;gap:8px;margin-top:14px}
 .mr-inline-actions{display:flex;align-items:center;gap:10px}
 .mr-btn{background:#5fd08a;color:#0b120e;border:0;border-radius:9px;

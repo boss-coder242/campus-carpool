@@ -14,6 +14,7 @@ export default function PostRide({ onPosted }) {
   const [form, setForm] = useState({
     from: "", to: "", date: todayISO(), time: "",
     seats: 3, price: "", note: "", women_only: false,
+    car_model: "", car_color: "",
   });
   const [isFemale, setIsFemale] = useState(false);
   const [error, setError] = useState("");
@@ -26,6 +27,19 @@ export default function PostRide({ onPosted }) {
       if (!user) return;
       const { data } = await supabase.from("users").select("gender").eq("id", user.id).single();
       setIsFemale(data?.gender === "female");
+
+      // prefill the car from the last ride this student posted
+      const { data: last } = await supabase
+        .from("rides").select("car_model, car_color")
+        .eq("driver_id", user.id)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (last?.car_model || last?.car_color) {
+        setForm((f) => ({
+          ...f,
+          car_model: f.car_model || last.car_model || "",
+          car_color: f.car_color || last.car_color || "",
+        }));
+      }
     })();
   }, []);
 
@@ -56,11 +70,16 @@ export default function PostRide({ onPosted }) {
       price: price === "" ? 0 : Number(price),
       note: note.trim() || null,
       women_only: isFemale ? form.women_only : false,
+      car_model: form.car_model.trim() || null,
+      car_color: form.car_color.trim() || null,
     });
     setBusy(false);
     if (err) { setError(err.message); return; }
 
-    setForm({ from: "", to: "", date: todayISO(), time: "", seats: 3, price: "", note: "", women_only: false });
+    setForm({
+      from: "", to: "", date: todayISO(), time: "", seats: 3, price: "", note: "",
+      women_only: false, car_model: form.car_model, car_color: form.car_color,
+    });
     onPosted?.();
   }
 
@@ -110,6 +129,20 @@ export default function PostRide({ onPosted }) {
           </div>
         </div>
 
+        <div className="pr-grid">
+          <div>
+            <label className="pr-label" htmlFor="car">Car <span className="pr-opt">(optional)</span></label>
+            <input id="car" placeholder="Maruti Swift" value={form.car_model}
+              onChange={set("car_model")} />
+          </div>
+          <div>
+            <label className="pr-label" htmlFor="carcol">Colour <span className="pr-opt">(optional)</span></label>
+            <input id="carcol" placeholder="White" value={form.car_color}
+              onChange={set("car_color")} />
+          </div>
+        </div>
+        <p className="pr-hint">Helps riders spot you at a busy gate.</p>
+
         <label className="pr-label" htmlFor="note">Note <span className="pr-opt">(optional)</span></label>
         <textarea id="note" rows={3} placeholder="AC car, leaving sharp, drop near ISBT…"
           value={form.note} onChange={set("note")} />
@@ -148,6 +181,7 @@ input,select,textarea{width:100%;box-sizing:border-box;background:#0e1512;color:
   font-family:inherit}
 textarea{resize:vertical}
 input:focus,select:focus,textarea:focus{border-color:#5fd08a;box-shadow:0 0 0 3px rgba(95,208,138,.15)}
+.pr-hint{color:#6d7f74;font-size:12px;margin:8px 0 0;line-height:1.4}
 .pr-toggle{display:flex;gap:11px;align-items:flex-start;margin-top:18px;padding:14px;
   background:#16201b;border:1px solid #24332b;border-radius:12px;cursor:pointer}
 .pr-toggle input{width:18px;height:18px;flex:none;margin-top:2px;accent-color:#c48fd0}
