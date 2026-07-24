@@ -18,7 +18,7 @@ export const supabase = createClient(url, anonKey);
 
 // TESTING: set back to true before real students use this, so only
 // @chitkara.edu.in emails are accepted. false = allow any email.
-const RESTRICT_TO_CHITKARA = false;
+const RESTRICT_TO_CHITKARA = true;
 
 export function isAllowedEmail(email) {
   if (typeof email !== "string") return false;
