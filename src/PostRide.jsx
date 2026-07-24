@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { CAMPUS_LOCATIONS } from "./locations";
 
 /*
   Post a ride. Client sends driver_id = self; seats_left auto-inits to
@@ -66,6 +67,9 @@ export default function PostRide({ onPosted }) {
   return (
     <div className="pr-wrap">
       <style>{css}</style>
+      <datalist id="pr-locs">
+        {CAMPUS_LOCATIONS.map((l) => <option key={l} value={l} />)}
+      </datalist>
       <h1>Post a ride</h1>
       <p className="pr-sub">Fill your empty seats and split the fare.</p>
 
@@ -73,11 +77,11 @@ export default function PostRide({ onPosted }) {
         <div className="pr-grid">
           <div>
             <label className="pr-label" htmlFor="from">From</label>
-            <input id="from" autoFocus placeholder="Main Gate" value={form.from} onChange={set("from")} />
+            <input id="from" list="pr-locs" autoFocus placeholder="Main Gate" value={form.from} onChange={set("from")} />
           </div>
           <div>
             <label className="pr-label" htmlFor="to">To</label>
-            <input id="to" placeholder="Panchkula" value={form.to} onChange={set("to")} />
+            <input id="to" list="pr-locs" placeholder="Panchkula" value={form.to} onChange={set("to")} />
           </div>
         </div>
 

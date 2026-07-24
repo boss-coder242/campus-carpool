@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { CAMPUS_LOCATIONS } from "./locations";
 
 export default function RidesFeed() {
   const [rides, setRides] = useState([]);
@@ -10,6 +11,7 @@ export default function RidesFeed() {
   const [joinedIds, setJoinedIds] = useState(new Set());
   const [isFemale, setIsFemale] = useState(false);
   const [femaleFilter, setFemaleFilter] = useState(false);
+  const [filter, setFilter] = useState({ from: "", to: "", date: "" });
 
   useEffect(() => {
     (async () => {
@@ -88,16 +90,45 @@ export default function RidesFeed() {
     });
   }
 
-  const shown = femaleFilter ? rides.filter((r) => r.women_only) : rides;
+  const q = (s) => s.trim().toLowerCase();
+  const activeFilters = filter.from || filter.to || filter.date || femaleFilter;
+  const shown = rides.filter((r) => {
+    if (femaleFilter && !r.women_only) return false;
+    if (filter.from && !r.from.toLowerCase().includes(q(filter.from))) return false;
+    if (filter.to && !r.to.toLowerCase().includes(q(filter.to))) return false;
+    if (filter.date && r.date !== filter.date) return false;
+    return true;
+  });
+
+  const clearFilters = () => setFilter({ from: "", to: "", date: "" });
 
   return (
     <div className="rf-wrap">
       <style>{css}</style>
+      <datalist id="rf-locs">
+        {CAMPUS_LOCATIONS.map((l) => <option key={l} value={l} />)}
+      </datalist>
 
       <header className="rf-head">
         <h1>Rides leaving soon</h1>
         <button className="rf-refresh" onClick={loadRides}>Refresh</button>
       </header>
+
+      <div className="rf-search">
+        <div className="rf-search-row">
+          <input list="rf-locs" placeholder="From" value={filter.from}
+            onChange={(e) => setFilter({ ...filter, from: e.target.value })} />
+          <span className="rf-search-arrow">→</span>
+          <input list="rf-locs" placeholder="To" value={filter.to}
+            onChange={(e) => setFilter({ ...filter, to: e.target.value })} />
+        </div>
+        <div className="rf-search-row">
+          <input type="date" min={new Date().toISOString().slice(0, 10)} value={filter.date}
+            onChange={(e) => setFilter({ ...filter, date: e.target.value })} />
+          {(filter.from || filter.to || filter.date) &&
+            <button className="rf-clear" onClick={clearFilters}>Clear</button>}
+        </div>
+      </div>
 
       {isFemale && (
         <button className={`rf-filter ${femaleFilter ? "on" : ""}`}
@@ -112,8 +143,10 @@ export default function RidesFeed() {
 
       {!loading && shown.length === 0 && (
         <div className="rf-empty">
-          <p>{femaleFilter ? "No women-only rides right now." : "No rides posted yet."}</p>
-          <p className="rf-dim">Be the first — post one and fill your empty seats.</p>
+          <p>{activeFilters ? "No rides match your search." : "No rides posted yet."}</p>
+          <p className="rf-dim">
+            {activeFilters ? "Try widening the route or date." : "Be the first — post one and fill your empty seats."}
+          </p>
         </div>
       )}
 
@@ -187,6 +220,15 @@ const css = `
 .rf-msg{background:#1a2a20;border:1px solid #2e4a38;color:#c9e8d4;
   border-radius:10px;padding:11px 14px;font-size:13.5px;margin:0 0 16px}
 .rf-dim{color:#93a69a}
+.rf-search{background:#16201b;border:1px solid #24332b;border-radius:14px;
+  padding:12px;margin:0 0 14px;display:flex;flex-direction:column;gap:10px}
+.rf-search-row{display:flex;align-items:center;gap:8px}
+.rf-search input{flex:1;min-width:0;box-sizing:border-box;background:#0e1512;color:#e8efe9;
+  border:1px solid #2b3d33;border-radius:9px;padding:10px 12px;font-size:14px;outline:none}
+.rf-search input:focus{border-color:#5fd08a;box-shadow:0 0 0 3px rgba(95,208,138,.15)}
+.rf-search-arrow{color:#5fd08a;flex:none}
+.rf-clear{background:none;border:1px solid #2b3d33;color:#93a69a;border-radius:9px;
+  padding:9px 14px;font-size:13px;cursor:pointer;flex:none}
 .rf-filter{background:none;border:1px solid #4a3a52;color:#c48fd0;border-radius:20px;
   padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin:0 0 16px}
 .rf-filter.on{background:#2a1f30;border-color:#c48fd0}
