@@ -140,6 +140,21 @@ My Rides / Profile. Each screen owns its layout via an inline `<style>` block.
 
 ## Style notes
 
-Dark green palette: bg `#0e1512`, card `#16201b`, border `#24332b`,
-accent `#5fd08a`, muted text `#93a69a`. Inter / system sans.
+**Dark premium (Uber-style).** The design system lives in `src/index.css` as
+CSS variables — components must reference `var(--…)`, never hard-coded hex.
+
+- Surfaces: `--bg #0a0a0b`, `--surface #151517`, `--surface-2 #1c1c1f`,
+  `--surface-3 #232327`, `--border #26262a`, `--border-strong #3a3a40`
+- Text: `--text #fff`, `--text-2 #a1a1aa`, `--text-3 #71717a`
+- **Primary action is white-on-black** (`--accent` / `--accent-fg`) — not a
+  colour. Colour is reserved for status only: `--green` (open/success),
+  `--amber` (full/ratings), `--blue` (completed), `--red` (cancel/danger),
+  `--pink` (women-only).
+- Radii `--radius 16px` / `--radius-sm 10px` / `--radius-pill`.
+- Type is bold and tight: headings 700–800 weight, `letter-spacing:-.03em`.
+
+`index.css` also ships shared primitives (`.cc-btn`, `.cc-card`, `.cc-badge`,
+`.cc-page`, `.cc-modal`, global `input/select/textarea`). Prefer these over
+new per-component styles; each screen's inline `<style>` should only hold
+layout specific to that screen.
 Keep responses and code concise — prefer mechanism over explanation.
