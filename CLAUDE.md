@@ -39,8 +39,9 @@ mirrored in `supabase/migrations/`. Run in order:
 | `06_reports_table_and_rls` | reports table, insert-own / select-own RLS |
 | `07_gender_and_women_only` | users.gender, rides.women_only, women-only enforcement |
 | `08_ride_contacts_rpc` | get_ride_contacts RPC — scoped phone reveal to co-riders |
-| `09_ride_requests_and_rls` | ride_requests table + RLS — **written, not wired to UI yet** |
+| `09_ride_requests_and_rls` | ride_requests table + RLS — the reverse board |
 | `10_vehicle_and_public_profile` | rides.car_model/car_color, public_profiles.created_at |
+| `11_booking_approval_and_reviews` | instant_book, passenger status, respond_booking, review comments |
 | `99_scratch_debug` | throwaway queries — reuse, never rename |
 
 ### Schema
@@ -50,8 +51,10 @@ users             id, email, phone, name, branch, year, gender,
                   rating_avg, rating_count, created_at
 rides             id, driver_id, "from", "to", date, time,
                   seats_total, seats_left, price, note, status,
-                  women_only, car_model, car_color, created_at
+                  women_only, car_model, car_color, instant_book, created_at
 ride_passengers   id, ride_id, user_id, joined_at, left_at
+ride_requests     id, rider_id, "from", "to", date, time, seats_needed,
+                  note, status, created_at
 ratings           id, ride_id, rater_id, rated_id, stars, created_at
 reports           id, reporter_id, reported_id, reason, ride_id, created_at
 ```
@@ -120,11 +123,48 @@ My Rides / Profile. Each screen owns its layout via an inline `<style>` block.
   under Auth → SMTP Settings before real students use this.
 - OTP codes expire after 1 hour by default.
 
+## Ride requests (the reverse board)
+
+`ride_requests` is the mirror of `rides`: a student posts where they *want* to
+go and drivers come to them. Plain RLS (no RPC) — insert-own, update-own,
+select-all. `status` is `open | fulfilled | cancelled`; like rides they're
+never deleted. `time` is nullable, meaning "flexible".
+
+Flow: **Post tab** has an `I'm driving / I need a ride` switch (`mode` in
+`PostRide.jsx`). **Rides tab** has a `Rides offered / Ride requests` switch.
+Tapping *Offer a ride* on someone's request lifts `{from,to,date}` up to
+`App.jsx` (`prefill`), flips to the Post tab and fills the form. Riders manage
+their own requests from **My Rides → My ride requests**.
+
+Riders on request cards are fetched in a **separate** `public_profiles` query,
+not an embedded join — PostgREST can't reliably infer the FK through the view.
+
+## Booking approval (instant vs request-to-book)
+
+`rides.instant_book` (default **true**) decides what `join_ride()` does:
+
+- `true`  → passenger row is created `confirmed`, exactly as before.
+- `false` → row is created `pending`; the driver accepts or declines with
+  **`respond_booking(passenger_id, accept)`**.
+
+**The seat is held either way** — `join_ride()` decrements `seats_left` even
+for a pending booking, so two students can't be promised the same seat.
+Declining sets `status='declined'` + `left_at=now()` (freeing the partial
+unique index so they may request again) and returns the seat.
+
+`ride_passengers.status` is `pending | confirmed | declined`. Anything that
+means "really on this ride" must filter `status = 'confirmed'` —
+`get_ride_contacts()` and `rate_user()` both do. A pending rider can still see
+the *driver's* number, but the driver only sees people they accepted.
+
 ## Ratings & reports (built)
 
-- **`rate_user(p_ride_id, p_rated_id, p_stars)`** is the only write path into
-  `ratings` (mirrors join/leave). It enforces: ride is `completed`, both
-  parties were on it, no self-rating, once per (ride, rater, rated). The
+- **`rate_user(p_ride_id, p_rated_id, p_stars, p_comment)`** is the only write
+  path into `ratings` (mirrors join/leave). It enforces: ride is `completed`,
+  both parties were `confirmed` on it, no self-rating, once per (ride, rater,
+  rated). `p_comment` is the optional written review. Reviews are read back
+  through the **`public_reviews`** view, which exposes stars/comment/date plus
+  the rater's *name* only — never their email, phone or gender. The
   `recalc_user_rating` trigger recomputes `rating_avg` / `rating_count` — it's
   `security definer` so it bypasses both `users` RLS and `protect_user_columns`
   (which only freezes a user's edits to their *own* row).

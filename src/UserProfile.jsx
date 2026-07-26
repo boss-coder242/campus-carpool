@@ -17,6 +17,7 @@ function memberSince(ts) {
 export default function UserProfile({ userId, onClose }) {
   const [p, setP] = useState(null);
   const [drove, setDrove] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
@@ -35,6 +36,16 @@ export default function UserProfile({ userId, onClose }) {
         .select("id", { count: "exact", head: true })
         .eq("driver_id", userId).eq("status", "completed");
       if (alive) setDrove(count ?? 0);
+
+      // written reviews (public_reviews exposes rater name only)
+      const { data: revs } = await supabase
+        .from("public_reviews")
+        .select("id, stars, comment, created_at, rater_name")
+        .eq("rated_id", userId)
+        .not("comment", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (alive) setReviews(revs ?? []);
     })();
     return () => { alive = false; };
   }, [userId]);
@@ -82,6 +93,21 @@ export default function UserProfile({ userId, onClose }) {
             <div className="up-verified">
               <span className="up-check">✓</span> Verified Chitkara student email
             </div>
+
+            {reviews.length > 0 && (
+              <div className="up-reviews">
+                <div className="up-rev-h">Reviews</div>
+                {reviews.map((rv) => (
+                  <div key={rv.id} className="up-rev">
+                    <div className="up-rev-top">
+                      <span className="up-rev-stars">{"★".repeat(rv.stars)}<span className="up-rev-off">{"★".repeat(5 - rv.stars)}</span></span>
+                      <span className="up-dim up-small">{rv.rater_name ?? "Student"}</span>
+                    </div>
+                    <p className="up-rev-body">{rv.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -114,4 +140,14 @@ const css = `
   border-top:1px solid var(--border);font-size:13px;color:var(--text-2)}
 .up-check{background:var(--green-dim);color:var(--green);border-radius:50%;
   width:21px;height:21px;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.up-reviews{margin-top:20px;padding-top:18px;border-top:1px solid var(--border);
+  max-height:230px;overflow-y:auto}
+.up-rev-h{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;
+  letter-spacing:.1em;margin-bottom:12px}
+.up-rev{padding:11px 0;border-bottom:1px solid var(--border)}
+.up-rev:last-child{border-bottom:0;padding-bottom:0}
+.up-rev-top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.up-rev-stars{color:var(--amber);font-size:12px;letter-spacing:1px}
+.up-rev-off{color:var(--surface-3)}
+.up-rev-body{margin:0;font-size:13.5px;line-height:1.5;color:var(--text-2)}
 `;

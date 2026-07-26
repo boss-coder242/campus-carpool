@@ -22,17 +22,50 @@ function fmtDate(d) {
 
 const STATUS_LABEL = { open: "Open", full: "Full", completed: "Completed", cancelled: "Cancelled" };
 
-function Stars({ onRate, busy }) {
+function Stars({ onPickStars, value = 0, busy, size }) {
   const [hover, setHover] = useState(0);
+  const lit = hover || value;
   return (
-    <div className="mr-stars" onMouseLeave={() => setHover(0)}>
+    <div className={`mr-stars ${size === "lg" ? "lg" : ""}`} onMouseLeave={() => setHover(0)}>
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" disabled={busy} className="mr-star"
-          onMouseEnter={() => setHover(n)} onClick={() => onRate(n)}
+          onMouseEnter={() => setHover(n)} onClick={() => onPickStars(n)}
           aria-label={`${n} star${n > 1 ? "s" : ""}`}>
-          <span className={n <= hover ? "on" : ""}>★</span>
+          <span className={n <= lit ? "on" : ""}>★</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/* Star rating + an optional written review, like BlaBlaCar's post-trip form. */
+function RateModal({ name, busy, onClose, onSubmit }) {
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState("");
+  return (
+    <div className="mr-overlay" onClick={onClose}>
+      <div className="mr-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Rate {name}</h3>
+        <p className="mr-dim mr-small">How was the ride? Your review is public on their profile.</p>
+
+        <div className="mr-rate-stars">
+          <Stars value={stars} onPickStars={setStars} size="lg" busy={busy} />
+          <span className="mr-dim mr-small">
+            {["", "Poor", "Okay", "Good", "Great", "Excellent"][stars] || "Tap to rate"}
+          </span>
+        </div>
+
+        <textarea rows={4} placeholder="On time, easy to find, good chat… (optional)"
+          value={comment} onChange={(e) => setComment(e.target.value)} maxLength={400} />
+
+        <div className="mr-actions">
+          <button className="mr-btn" disabled={busy || !stars}
+            onClick={() => onSubmit(stars, comment.trim())}>
+            {busy ? "Saving…" : "Submit rating"}
+          </button>
+          <button className="mr-btn ghost" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -75,6 +108,8 @@ export default function MyRides() {
   const [contacts, setContacts] = useState({}); // rideId -> [{id,name,phone,role}]
   const [openC, setOpenC] = useState(new Set()); // rideIds with contacts revealed
   const [viewUser, setViewUser] = useState(null);
+  const [myReqs, setMyReqs] = useState([]);
+  const [rating, setRating] = useState(null); // { rideId, userId, name }
 
   useEffect(() => { load(); }, []);
 
@@ -101,7 +136,7 @@ export default function MyRides() {
     const [drv, rid] = await Promise.all([
       supabase.from("rides").select("*").eq("driver_id", uid).order("date", { ascending: false }),
       supabase.from("ride_passengers")
-        .select("ride_id, left_at, ride:rides(*)")
+        .select("ride_id, left_at, status, ride:rides(*)")
         .eq("user_id", uid)
         .order("joined_at", { ascending: false }),
     ]);
@@ -117,7 +152,8 @@ export default function MyRides() {
     const needIds = new Set();
     if (drivingIds.length) {
       const { data: pax } = await supabase
-        .from("ride_passengers").select("ride_id, user_id, left_at").in("ride_id", drivingIds);
+        .from("ride_passengers").select("id, ride_id, user_id, left_at, status")
+        .in("ride_id", drivingIds);
       (pax ?? []).forEach((p) => {
         (paxMap[p.ride_id] ??= []).push(p);
         needIds.add(p.user_id);
@@ -142,6 +178,14 @@ export default function MyRides() {
     const { data: myRatings } = await supabase
       .from("ratings").select("ride_id, rated_id").eq("rater_id", uid);
     setRated(new Set((myRatings ?? []).map((r) => `${r.ride_id}|${r.rated_id}`)));
+
+    // ride requests I posted
+    const { data: reqs } = await supabase
+      .from("ride_requests")
+      .select("id, from, to, date, time, seats_needed, note, status")
+      .eq("rider_id", uid)
+      .order("date", { ascending: false });
+    setMyReqs(reqs ?? []);
 
     setLoading(false);
   }
@@ -173,14 +217,36 @@ export default function MyRides() {
     load();
   }
 
-  async function rate(rideId, ratedId, stars) {
-    setMessage(""); setBusyKey("rate" + rideId + ratedId);
-    const { error } = await supabase.rpc("rate_user", {
-      p_ride_id: rideId, p_rated_id: ratedId, p_stars: stars,
+  async function respond(passengerId, accept) {
+    setMessage(""); setBusyKey("resp" + passengerId);
+    const { error } = await supabase.rpc("respond_booking", {
+      p_passenger_id: passengerId, p_accept: accept,
     });
     setBusyKey(null);
     if (error) return setMessage(error.message);
-    setMessage("Thanks — rating saved.");
+    setMessage(accept ? "Booking accepted." : "Booking declined — the seat is free again.");
+    load();
+  }
+
+  async function setRequestStatus(id, status) {
+    setMessage(""); setBusyKey("req" + id);
+    const { error } = await supabase.from("ride_requests").update({ status }).eq("id", id);
+    setBusyKey(null);
+    if (error) return setMessage(error.message);
+    setMessage(status === "cancelled" ? "Request cancelled." : "Request marked as sorted.");
+    load();
+  }
+
+  async function rate(stars, comment) {
+    const { rideId, userId } = rating;
+    setMessage(""); setBusyKey("rate");
+    const { error } = await supabase.rpc("rate_user", {
+      p_ride_id: rideId, p_rated_id: userId, p_stars: stars, p_comment: comment || null,
+    });
+    setBusyKey(null);
+    if (error) return setMessage(error.message);
+    setRating(null);
+    setMessage("Thanks — your review is live on their profile.");
     load();
   }
 
@@ -218,6 +284,8 @@ export default function MyRides() {
         {driving.map((r) => {
           const list = (pax[r.id] ?? []);
           const active = list.filter((p) => !p.left_at);
+          const pending = active.filter((p) => p.status === "pending");
+          const confirmed = active.filter((p) => p.status !== "pending");
           return (
             <li key={r.id} className="mr-card">
               <div className="mr-top">
@@ -229,9 +297,31 @@ export default function MyRides() {
 
               {(r.status === "open" || r.status === "full") && (
                 <>
+                  {pending.length > 0 && (
+                    <div className="mr-pending">
+                      <div className="mr-pending-h">
+                        {pending.length} seat request{pending.length > 1 ? "s" : ""} waiting on you
+                      </div>
+                      {pending.map((p) => (
+                        <div key={p.id} className="mr-pending-row">
+                          <button className="mr-person" onClick={() => setViewUser(p.user_id)}>
+                            <div className="mr-name">{name(p.user_id)}</div>
+                            <div className="mr-dim mr-small">{meta(p.user_id)}</div>
+                          </button>
+                          <div className="mr-inline-actions">
+                            <button className="mr-btn sm" disabled={busyKey === "resp" + p.id}
+                              onClick={() => respond(p.id, true)}>Accept</button>
+                            <button className="mr-btn ghost sm" disabled={busyKey === "resp" + p.id}
+                              onClick={() => respond(p.id, false)}>Decline</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="mr-pax">
-                    {active.length === 0 ? <span className="mr-dim">No passengers yet.</span>
-                      : active.map((p) => (
+                    {confirmed.length === 0 ? <span className="mr-dim">No confirmed passengers yet.</span>
+                      : confirmed.map((p) => (
                         <button key={p.user_id} className="mr-chip" title="View profile"
                           onClick={() => setViewUser(p.user_id)}>{name(p.user_id)}</button>
                       ))}
@@ -257,8 +347,10 @@ export default function MyRides() {
                             <div className="mr-dim mr-small">{meta(p.user_id)}</div>
                           </button>
                           {done ? <span className="mr-tag">Rated</span>
-                            : <Stars busy={busyKey === "rate" + r.id + p.user_id}
-                                onRate={(s) => rate(r.id, p.user_id, s)} />}
+                            : <button className="mr-btn ghost sm"
+                                onClick={() => setRating({ rideId: r.id, userId: p.user_id, name: name(p.user_id) })}>
+                                Rate
+                              </button>}
                         </div>
                       );
                     })}
@@ -293,8 +385,10 @@ export default function MyRides() {
             <li key={r.id + row.ride_id} className="mr-card">
               <div className="mr-top">
                 <div className="mr-route">{r.from} <span className="mr-arrow">→</span> {r.to}</div>
-                <span className={`mr-badge s-${left ? "cancelled" : r.status}`}>
-                  {left ? "Left" : STATUS_LABEL[r.status]}
+                <span className={`mr-badge s-${left ? "cancelled"
+                  : row.status === "pending" ? "full" : r.status}`}>
+                  {left ? (row.status === "declined" ? "Declined" : "Left")
+                    : row.status === "pending" ? "Awaiting approval" : STATUS_LABEL[r.status]}
                 </span>
               </div>
               <div className="mr-when">{fmtDate(r.date)} · {fmtTime(r.time)} · ₹{Number(r.price).toFixed(0)}
@@ -316,7 +410,10 @@ export default function MyRides() {
                   )}
                   {r.status === "completed" && !left && (
                     done ? <span className="mr-tag">Rated</span>
-                      : <Stars busy={busyKey === "rate" + r.id + drv} onRate={(s) => rate(r.id, drv, s)} />
+                      : <button className="mr-btn ghost sm"
+                          onClick={() => setRating({ rideId: r.id, userId: drv, name: name(drv) })}>
+                          Rate driver
+                        </button>
                   )}
                   <button className="mr-link" onClick={() => setReport({ id: drv, name: name(drv), rideId: r.id })}>
                     Report
@@ -339,9 +436,48 @@ export default function MyRides() {
         })}
       </ul>
 
+      {/* ---------- MY REQUESTS ---------- */}
+      {myReqs.length > 0 && (
+        <>
+          <h2 className="mr-section">My ride requests</h2>
+          <ul className="mr-list">
+            {myReqs.map((r) => (
+              <li key={r.id} className="mr-card">
+                <div className="mr-top">
+                  <div className="mr-route">{r.from} <span className="mr-arrow">→</span> {r.to}</div>
+                  <span className={`mr-badge s-${r.status === "fulfilled" ? "completed"
+                    : r.status === "cancelled" ? "cancelled" : "open"}`}>
+                    {r.status === "fulfilled" ? "Sorted" : r.status === "cancelled" ? "Cancelled" : "Looking"}
+                  </span>
+                </div>
+                <div className="mr-when">
+                  {fmtDate(r.date)} · {r.time ? fmtTime(r.time) : "Flexible"} ·{" "}
+                  {r.seats_needed} seat{r.seats_needed > 1 ? "s" : ""}
+                </div>
+                {r.note && <p className="mr-req-note">{r.note}</p>}
+
+                {r.status === "open" && (
+                  <div className="mr-actions">
+                    <button className="mr-btn" disabled={busyKey === "req" + r.id}
+                      onClick={() => setRequestStatus(r.id, "fulfilled")}>Got a ride</button>
+                    <button className="mr-btn ghost" disabled={busyKey === "req" + r.id}
+                      onClick={() => setRequestStatus(r.id, "cancelled")}>Cancel</button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {report && (
         <ReportModal name={report.name} busy={busyKey === "report"}
           onClose={() => setReport(null)} onSubmit={submitReport} />
+      )}
+
+      {rating && (
+        <RateModal name={rating.name} busy={busyKey === "rate"}
+          onClose={() => setRating(null)} onSubmit={rate} />
       )}
 
       {viewUser && <UserProfile userId={viewUser} onClose={() => setViewUser(null)} />}
@@ -405,6 +541,13 @@ const css = `
   color:inherit;font:inherit;min-width:0}
 .mr-person:hover .mr-name{text-decoration:underline}
 .mr-car{margin-top:10px;font-size:12.5px;color:var(--text-2)}
+.mr-req-note{font-size:13.5px;color:var(--text-2);margin:10px 0 0;line-height:1.5}
+.mr-pending{margin-top:14px;padding:14px;background:var(--amber-dim);
+  border:1px solid rgba(251,191,36,.25);border-radius:var(--radius-sm)}
+.mr-pending-h{font-size:12.5px;font-weight:700;color:var(--amber);margin-bottom:10px}
+.mr-pending-row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding-top:10px;border-top:1px solid rgba(251,191,36,.18)}
+.mr-pending-row:first-of-type{padding-top:0;border-top:0}
 .mr-actions{display:flex;gap:8px;margin-top:16px}
 .mr-inline-actions{display:flex;align-items:center;gap:10px}
 .mr-btn{background:var(--accent);color:var(--accent-fg);border:0;border-radius:var(--radius-sm);
@@ -439,6 +582,8 @@ const css = `
 .mr-cbtn.wa{background:var(--green);border-color:var(--green);color:#08210f}
 .mr-cbtn.wa:hover{opacity:.9}
 .mr-stars{display:flex;gap:3px}
+.mr-stars.lg .mr-star{font-size:32px;padding:3px}
+.mr-rate-stars{display:flex;align-items:center;gap:12px;margin:16px 0 4px}
 .mr-star{background:none;border:0;cursor:pointer;padding:2px;font-size:21px;line-height:1;
   color:var(--surface-3);transition:color .12s}
 .mr-star .on{color:var(--amber)}

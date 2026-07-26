@@ -30,14 +30,24 @@ const TABS = [
 
 function Shell() {
   const [tab, setTab] = useState("rides");
+  // set when a driver taps "Offer a ride" on someone's request in the feed
+  const [prefill, setPrefill] = useState(null);
+
+  function offerFor(route) {
+    setPrefill(route);
+    setTab("post");
+  }
 
   return (
     <div className="app-shell">
       <style>{css}</style>
 
       <main className="app-main">
-        {tab === "rides" && <RidesFeed />}
-        {tab === "post" && <PostRide onPosted={() => setTab("myrides")} />}
+        {tab === "rides" && <RidesFeed onOffer={offerFor} />}
+        {tab === "post" && (
+          <PostRide prefill={prefill} onPrefillUsed={() => setPrefill(null)}
+            onPosted={() => setTab("myrides")} />
+        )}
         {tab === "myrides" && <MyRides />}
         {tab === "profile" && <Profile />}
       </main>

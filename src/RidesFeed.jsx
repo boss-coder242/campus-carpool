@@ -3,7 +3,10 @@ import { supabase } from "./supabaseClient";
 import { CAMPUS_LOCATIONS } from "./locations";
 import UserProfile from "./UserProfile";
 
-export default function RidesFeed() {
+export default function RidesFeed({ onOffer }) {
+  const [view, setView] = useState("rides"); // rides | requests
+  const [requests, setRequests] = useState([]);
+  const [riders, setRiders] = useState({});  // id -> public profile
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState(null);
@@ -13,6 +16,7 @@ export default function RidesFeed() {
   const [isFemale, setIsFemale] = useState(false);
   const [femaleFilter, setFemaleFilter] = useState(false);
   const [filter, setFilter] = useState({ from: "", to: "", date: "" });
+  const [sort, setSort] = useState("soonest");
   const [viewUser, setViewUser] = useState(null);
 
   useEffect(() => {
@@ -27,7 +31,41 @@ export default function RidesFeed() {
     })();
     loadRides();
     loadMyseats();
+    loadRequests();
   }, []);
+
+  // Riders are fetched separately rather than embedded — PostgREST can't
+  // always infer the FK through the public_profiles view (see CLAUDE.md).
+  async function loadRequests() {
+    const { data, error } = await supabase
+      .from("ride_requests")
+      .select("id, rider_id, from, to, date, time, seats_needed, note, status")
+      .eq("status", "open")
+      .gte("date", new Date().toISOString().slice(0, 10))
+      .order("date").order("time", { nullsFirst: true });
+    if (error) { setMessage(error.message); return; }
+    const rows = data ?? [];
+    setRequests(rows);
+
+    const ids = [...new Set(rows.map((r) => r.rider_id))];
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from("public_profiles")
+        .select("id, name, branch, year, rating_avg, rating_count").in("id", ids);
+      const m = {};
+      (profs ?? []).forEach((p) => { m[p.id] = p; });
+      setRiders(m);
+    }
+  }
+
+  async function cancelRequest(id) {
+    setMessage("");
+    const { error } = await supabase
+      .from("ride_requests").update({ status: "cancelled" }).eq("id", id);
+    if (error) { setMessage(error.message); return; }
+    setMessage("Request cancelled.");
+    loadRequests();
+  }
 
   async function loadRides() {
     setLoading(true);
@@ -35,7 +73,7 @@ export default function RidesFeed() {
       .from("rides")
       .select(`
         id, from, to, date, time, seats_left, seats_total, price, note, status, women_only,
-        car_model, car_color,
+        car_model, car_color, instant_book,
         driver:public_profiles!driver_id (id, name, branch, year, rating_avg, rating_count)
       `)
       .eq("status", "open")
@@ -63,7 +101,10 @@ export default function RidesFeed() {
     const { error } = await supabase.rpc("join_ride", { p_ride_id: rideId });
     setJoiningId(null);
     if (error) { setMessage(error.message); return; }
-    setMessage("Seat booked. Check My Rides for the driver's number.");
+    const r = rides.find((x) => x.id === rideId);
+    setMessage(r && r.instant_book === false
+      ? "Request sent. You'll hold the seat until the driver replies."
+      : "Seat booked. Check My Rides for the driver's number.");
     loadRides();
     loadMyseats();
   }
@@ -97,14 +138,31 @@ export default function RidesFeed() {
 
   const q = (s) => s.trim().toLowerCase();
   const activeFilters = filter.from || filter.to || filter.date || femaleFilter;
+
+  const SORTS = {
+    soonest: (a, b) => (a.date + a.time).localeCompare(b.date + b.time),
+    cheapest: (a, b) => Number(a.price) - Number(b.price) || (a.date + a.time).localeCompare(b.date + b.time),
+    rated: (a, b) => (Number(b.driver?.rating_avg) || 0) - (Number(a.driver?.rating_avg) || 0),
+    seats: (a, b) => b.seats_left - a.seats_left,
+  };
+
   const shown = rides.filter((r) => {
     if (femaleFilter && !r.women_only) return false;
     if (filter.from && !r.from.toLowerCase().includes(q(filter.from))) return false;
     if (filter.to && !r.to.toLowerCase().includes(q(filter.to))) return false;
     if (filter.date && r.date !== filter.date) return false;
     return true;
+  }).sort(SORTS[sort]);
+
+  const shownReqs = requests.filter((r) => {
+    if (filter.from && !r.from.toLowerCase().includes(q(filter.from))) return false;
+    if (filter.to && !r.to.toLowerCase().includes(q(filter.to))) return false;
+    if (filter.date && r.date !== filter.date) return false;
+    return true;
   });
 
+  const showingRides = view === "rides";
+  const count = showingRides ? shown.length : shownReqs.length;
   const clearFilters = () => setFilter({ from: "", to: "", date: "" });
 
   return (
@@ -116,9 +174,10 @@ export default function RidesFeed() {
 
       <header className="rf-head">
         <div>
-          <h1 className="cc-h1">Find a ride</h1>
+          <h1 className="cc-h1">{showingRides ? "Find a ride" : "Riders looking"}</h1>
           <p className="cc-sub">
-            {loading ? "Loading…" : `${shown.length} ride${shown.length === 1 ? "" : "s"} available`}
+            {loading && showingRides ? "Loading…"
+              : `${count} ${showingRides ? "ride" : "request"}${count === 1 ? "" : "s"} ${showingRides ? "available" : "open"}`}
           </p>
         </div>
         <button className="rf-refresh" onClick={loadRides} aria-label="Refresh">
@@ -128,6 +187,18 @@ export default function RidesFeed() {
           </svg>
         </button>
       </header>
+
+      {/* rides vs requests */}
+      <div className="rf-seg" role="tablist">
+        <button role="tab" aria-selected={showingRides}
+          className={showingRides ? "on" : ""} onClick={() => setView("rides")}>
+          Rides offered
+        </button>
+        <button role="tab" aria-selected={!showingRides}
+          className={!showingRides ? "on" : ""} onClick={() => setView("requests")}>
+          Ride requests
+        </button>
+      </div>
 
       {/* ---------- search ---------- */}
       <div className="rf-search">
@@ -151,32 +222,112 @@ export default function RidesFeed() {
         </div>
       </div>
 
-      {isFemale && (
-        <button className={`rf-chip ${femaleFilter ? "on" : ""}`}
-          onClick={() => setFemaleFilter((v) => !v)}>
-          ♀ Women-only
-        </button>
+      {showingRides && (
+        <div className="rf-tools">
+          {isFemale && (
+            <button className={`rf-chip ${femaleFilter ? "on" : ""}`}
+              onClick={() => setFemaleFilter((v) => !v)}>
+              ♀ Women-only
+            </button>
+          )}
+          <label className="rf-sort">
+            <span className="cc-dim cc-small">Sort</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="soonest">Earliest departure</option>
+              <option value="cheapest">Lowest price</option>
+              <option value="rated">Best rated driver</option>
+              <option value="seats">Most seats free</option>
+            </select>
+          </label>
+        </div>
       )}
 
       {message && <p className="cc-msg" role="status">{message}</p>}
 
-      {loading && (
+      {loading && showingRides && (
         <div className="rf-list">
           {[0, 1, 2].map((i) => <div key={i} className="rf-skeleton" />)}
         </div>
       )}
 
-      {!loading && shown.length === 0 && (
+      {!loading && count === 0 && (
         <div className="cc-empty">
-          <p>{activeFilters ? "No rides match your search." : "No rides posted yet."}</p>
+          <p>
+            {activeFilters ? `No ${showingRides ? "rides" : "requests"} match your search.`
+              : showingRides ? "No rides posted yet." : "No one is looking for a ride."}
+          </p>
           <p className="cc-dim cc-small">
             {activeFilters ? "Try widening the route or date."
-              : "Be the first — post one and fill your empty seats."}
+              : showingRides ? "Be the first — post one and fill your empty seats."
+                : "Post a request and let drivers come to you."}
           </p>
         </div>
       )}
 
-      <ul className="rf-list">
+      {/* ---------- ride requests ---------- */}
+      {!showingRides && (
+        <ul className="rf-list">
+          {shownReqs.map((r) => {
+            const rider = riders[r.rider_id];
+            const mine = r.rider_id === userId;
+            return (
+              <li key={r.id} className="rf-card">
+                <div className="rf-top">
+                  <div className="rf-route">
+                    <div className="rf-leg">
+                      <div className="rf-time">{fmtDate(r.date)}</div>
+                      <div className="rf-track"><span className="rf-dot" /><span className="rf-line" /></div>
+                      <div className="rf-place">{r.from}</div>
+                    </div>
+                    <div className="rf-leg">
+                      <div className="rf-time rf-dim-time">{r.time ? fmtTime(r.time) : "Flexible"}</div>
+                      <div className="rf-track"><span className="rf-dot end" /></div>
+                      <div className="rf-place">{r.to}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rf-meta">
+                  <span className="cc-badge cc-badge-grey">
+                    {r.seats_needed} seat{r.seats_needed > 1 ? "s" : ""} needed
+                  </span>
+                  {!r.time && <span className="cc-badge cc-badge-grey">Time flexible</span>}
+                </div>
+
+                {r.note && <p className="rf-note">{r.note}</p>}
+
+                <div className="rf-foot">
+                  <button className="rf-driver" title="View profile"
+                    onClick={() => setViewUser(r.rider_id)}>
+                    <span className="cc-avatar rf-avatar">{rider?.name?.[0]?.toUpperCase() ?? "?"}</span>
+                    <span className="rf-driver-txt">
+                      <span className="rf-name">{rider?.name ?? "Student"}</span>
+                      <span className="rf-driver-sub">
+                        {rider?.rating_count > 0
+                          ? <><span className="rf-star">★</span> {Number(rider.rating_avg).toFixed(1)} · {rider?.branch}</>
+                          : <>New · {rider?.branch ?? "Chitkara"}</>}
+                      </span>
+                    </span>
+                  </button>
+
+                  {mine ? (
+                    <button className="cc-btn cc-btn-ghost cc-btn-sm"
+                      onClick={() => cancelRequest(r.id)}>Cancel</button>
+                  ) : (
+                    <button className="cc-btn cc-btn-sm"
+                      onClick={() => onOffer?.({ from: r.from, to: r.to, date: r.date })}>
+                      Offer a ride
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* ---------- rides ---------- */}
+      <ul className="rf-list" hidden={!showingRides}>
         {shown.map((r) => {
           const mine = r.driver?.id === userId;
           const joined = joinedIds.has(r.id);
@@ -207,6 +358,9 @@ export default function RidesFeed() {
                 <span className={`cc-badge ${r.seats_left <= 1 ? "cc-badge-amber" : "cc-badge-grey"}`}>
                   {r.seats_left} of {r.seats_total} left
                 </span>
+                {r.instant_book === false
+                  ? <span className="cc-badge cc-badge-amber">Driver approves</span>
+                  : <span className="cc-badge cc-badge-green">⚡ Instant</span>}
                 {r.women_only && <span className="cc-badge cc-badge-pink">♀ Women only</span>}
                 {(r.car_model || r.car_color) && (
                   <span className="cc-badge cc-badge-grey">
@@ -244,7 +398,8 @@ export default function RidesFeed() {
                 ) : (
                   <button className="cc-btn cc-btn-sm" disabled={joiningId === r.id}
                     onClick={() => joinRide(r.id)}>
-                    {joiningId === r.id ? "Booking…" : "Take a seat"}
+                    {joiningId === r.id ? "Sending…"
+                      : r.instant_book === false ? "Request seat" : "Take a seat"}
                   </button>
                 )}
               </div>
@@ -279,13 +434,25 @@ const css = `
   cursor:pointer;padding:6px 2px;text-decoration:underline;text-underline-offset:3px;flex:none}
 .rf-clear:hover{color:var(--text)}
 
+.rf-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;margin-bottom:18px}
+.rf-sort{display:flex;align-items:center;gap:8px;margin-left:auto}
+.rf-sort select{width:auto;padding:8px 11px;font-size:13px;font-weight:600;
+  border-radius:var(--radius-pill);background:var(--surface-2)}
 .rf-chip{background:none;border:1px solid var(--border-strong);color:var(--text-2);
   border-radius:var(--radius-pill);padding:8px 15px;font-size:13px;font-weight:600;
-  font-family:inherit;cursor:pointer;margin-bottom:18px}
+  font-family:inherit;cursor:pointer}
 .rf-chip.on{background:var(--pink-dim);border-color:var(--pink);color:var(--pink)}
 
 /* list + cards */
 .rf-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.rf-list[hidden]{display:none}
+.rf-seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;margin-bottom:14px}
+.rf-seg button{background:none;border:0;color:var(--text-2);font-family:inherit;
+  font-size:13.5px;font-weight:650;padding:10px;border-radius:7px;cursor:pointer;
+  transition:background .15s,color .15s}
+.rf-seg button.on{background:var(--accent);color:var(--accent-fg)}
 .rf-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   padding:18px;transition:border-color .15s,transform .15s}
 .rf-card:hover{border-color:var(--border-strong)}
