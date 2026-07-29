@@ -2,9 +2,11 @@ import heroPhoto from "./assets/hero-friends.png";
 
 /*
   Pre-login marketing splash — shown to signed-out visitors before the
-  email step. Everything here is decorative: there is no data to search
-  without an account (RLS requires `authenticated`), so every control
-  just leads into the sign-in flow via onStart().
+  email step. Laid out like blablacar.in: a full-width hero band (nav +
+  headline/photo split + search bar) sitting on --surface, then a plain
+  feature row below. Everything here is decorative: there is no data to
+  search without an account (RLS requires `authenticated`), so every
+  control just leads into the sign-in flow via onStart().
 */
 
 const FEATURES = [
@@ -20,71 +22,83 @@ const FEATURES = [
   },
   {
     icon: <><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></>,
-    title: "Verified students only",
-    text: "Every rider signs in with a @chitkara.edu.in email. Ratings and reviews after every ride.",
+    title: "Ride with confidence",
+    text: "Every rider signs in with a @chitkara.edu.in email, then rates and reviews after each ride.",
   },
 ];
 
-const Icon = ({ d }) => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-    strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const Icon = ({ d, size = 22, sw = 1.9 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor"
+    strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {d}
   </svg>
 );
+
+const SEARCH_ICON = <><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></>;
 
 export default function Landing({ onStart }) {
   return (
     <div className="ld-page">
       <style>{css}</style>
 
-      <header className="ld-nav">
-        <div className="ld-brand">
-          <span className="ld-logo">⇄</span>
-          <span>Campus Carpool</span>
-        </div>
-        <button className="cc-btn cc-btn-ghost cc-btn-sm" onClick={onStart}>Sign in</button>
-      </header>
-
-      <section className="ld-hero">
-        <div className="ld-hero-txt">
-          <h1 className="ld-h1">Share the ride.<br />Split the fare.</h1>
-          <p className="ld-sub">
-            The carpool board built for Chitkara students — post an empty seat
-            or find one, anywhere between campus and home.
-          </p>
-          <div className="ld-cta-row">
-            <button className="cc-btn cc-btn-block" onClick={onStart}>Get started</button>
+      {/* full-width band, like BlaBlaCar's hero section */}
+      <div className="ld-band">
+        <header className="ld-nav">
+          <div className="ld-brand">
+            <span className="ld-logo">⇄</span>
+            <span>Campus Carpool</span>
           </div>
-          <p className="ld-fine">Only @chitkara.edu.in emails can sign in.</p>
-        </div>
-
-        <div className="ld-art">
-          <img className="ld-photo" src={heroPhoto} alt="Students sharing a ride together, laughing in the car" />
-          <div className="ld-photo-tag">
-            <span className="ld-photo-logo">⇄</span> Campus Carpool
+          <div className="ld-nav-actions">
+            <button className="ld-icon-btn" onClick={onStart} aria-label="Search">
+              <Icon d={SEARCH_ICON} size={18} />
+            </button>
+            <button className="cc-btn cc-btn-ghost cc-btn-sm ld-nav-cta" onClick={onStart}>
+              Offer a ride
+            </button>
+            <button className="ld-avatar" onClick={onStart} aria-label="Sign in">
+              <Icon d={<><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20a7.5 7.5 0 0 1 15 0" /></>} size={17} sw={2.1} />
+            </button>
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* decorative search — routes into sign-in, nothing to browse pre-login */}
-      <button className="ld-search" onClick={onStart}>
-        <div className="ld-search-field">
-          <span className="ld-pin from" />
-          <div>
+        <section className="ld-hero">
+          <div className="ld-hero-txt">
+            <h1 className="ld-h1">Travel together.<br />Spend smarter.</h1>
+            <p className="ld-sub">
+              The carpool board built for Chitkara students — post an empty
+              seat or find one, anywhere between campus and home.
+            </p>
+          </div>
+
+          <div className="ld-art">
+            <img className="ld-photo" src={heroPhoto} alt="Students sharing a ride together, laughing in the car" />
+          </div>
+        </section>
+
+        {/* decorative search — routes into sign-in, nothing to browse pre-login */}
+        <button className="ld-search" onClick={onStart}>
+          <div className="ld-search-field">
             <div className="ld-search-label">From</div>
-            <div className="ld-search-val">Main Gate</div>
+            <div className="ld-search-val">Main Gate, Chitkara</div>
           </div>
-        </div>
-        <div className="ld-search-div" />
-        <div className="ld-search-field">
-          <span className="ld-pin to" />
-          <div>
+          <div className="ld-search-div" />
+          <div className="ld-search-field">
             <div className="ld-search-label">To</div>
             <div className="ld-search-val">Panchkula</div>
           </div>
-        </div>
-        <span className="cc-btn ld-search-btn">Find a ride</span>
-      </button>
+          <div className="ld-search-div" />
+          <div className="ld-search-field ld-search-field-sm">
+            <div className="ld-search-label">Date</div>
+            <div className="ld-search-val">Today</div>
+          </div>
+          <span className="cc-btn ld-search-btn">Search</span>
+        </button>
+
+        <label className="ld-check">
+          <input type="checkbox" checked readOnly />
+          Show women-only rides
+        </label>
+      </div>
 
       <section className="ld-features">
         {FEATURES.map((f) => (
@@ -97,9 +111,10 @@ export default function Landing({ onStart }) {
       </section>
 
       <footer className="ld-footer">
-        <button className="cc-btn cc-btn-ghost cc-btn-block" onClick={onStart}>
+        <button className="cc-btn cc-btn-block" onClick={onStart}>
           Sign in with your college email
         </button>
+        <p className="ld-fine">Only @chitkara.edu.in addresses can ride.</p>
       </footer>
     </div>
   );
@@ -107,61 +122,80 @@ export default function Landing({ onStart }) {
 
 const css = `
 .ld-page{min-height:100vh;background:var(--bg);color:var(--text)}
-.ld-nav{max-width:620px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
-  padding:20px 18px 0}
+
+/* ---------- hero band ---------- */
+.ld-band{background:var(--surface);border-bottom:1px solid var(--border);
+  padding-bottom:30px}
+.ld-nav{max-width:1040px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px}
 .ld-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:-.02em}
 .ld-logo{background:var(--text);color:var(--bg);border-radius:9px;width:28px;height:28px;
   display:grid;place-items:center;font-size:15px;font-weight:800;flex:none}
+.ld-nav-actions{display:flex;align-items:center;gap:10px}
+.ld-icon-btn{background:none;border:0;color:var(--text-2);width:34px;height:34px;
+  border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.ld-icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.ld-nav-cta{display:none}
+.ld-avatar{background:var(--surface-3);border:1px solid var(--border-strong);color:var(--text-2);
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.ld-avatar:hover{color:var(--text)}
 
-.ld-hero{max-width:620px;margin:0 auto;padding:36px 18px 8px;display:flex;flex-direction:column;gap:28px}
-.ld-h1{font-size:34px;font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0}
-.ld-sub{color:var(--text-2);font-size:15px;line-height:1.55;margin:14px 0 0;max-width:440px}
-.ld-cta-row{margin-top:22px}
-.ld-fine{color:var(--text-3);font-size:12px;margin:10px 0 0}
+.ld-hero{max-width:1040px;margin:0 auto;padding:18px 20px 8px;
+  display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.ld-h1{font-family:'Poppins',var(--sans,inherit);font-size:44px;font-weight:800;
+  letter-spacing:-.03em;line-height:1.08;margin:0}
+.ld-sub{color:var(--text-2);font-size:16px;line-height:1.6;margin:18px 0 0;max-width:420px}
 
-/* hero photo */
-.ld-art{position:relative;border-radius:var(--radius);overflow:hidden;
-  border:1px solid var(--border);box-shadow:var(--shadow);max-height:340px}
-.ld-photo{display:block;width:100%;height:100%;max-height:340px;object-fit:cover}
-.ld-photo-tag{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:8px;
-  background:rgba(10,10,11,.72);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);
-  color:var(--text);font-size:12.5px;font-weight:700;padding:7px 13px 7px 9px;
-  border-radius:var(--radius-pill)}
-.ld-photo-logo{background:var(--text);color:var(--bg);border-radius:7px;width:20px;height:20px;
-  display:grid;place-items:center;font-size:12px;font-weight:800;flex:none}
+.ld-art{border-radius:20px;overflow:hidden;border:1px solid var(--border);
+  box-shadow:var(--shadow);aspect-ratio:6/5}
+.ld-photo{display:block;width:100%;height:100%;object-fit:cover}
 
-/* decorative search bar */
-.ld-search{display:flex;align-items:center;gap:0;max-width:620px;margin:28px auto 0;
-  width:calc(100% - 36px);background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px 16px;cursor:pointer;font-family:inherit;
-  transition:border-color .15s}
-.ld-search:hover{border-color:var(--border-strong)}
-.ld-search-field{display:flex;align-items:center;gap:11px;flex:1;text-align:left;min-width:0}
-.ld-pin{width:9px;height:9px;border-radius:50%;flex:none}
-.ld-pin.from{background:var(--text-3)}
-.ld-pin.to{background:var(--green)}
-.ld-search-label{font-size:10.5px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
-.ld-search-val{font-size:14.5px;font-weight:600;color:var(--text)}
-.ld-search-div{width:1px;height:30px;background:var(--border);margin:0 16px;flex:none}
-.ld-search-btn{flex:none;padding:11px 18px;font-size:13.5px;margin-left:14px}
+/* ---------- search bar (sits inside the band, BlaBlaCar-style) ---------- */
+.ld-search{display:flex;align-items:stretch;max-width:1040px;margin:30px auto 0;
+  width:calc(100% - 40px);background:var(--bg);border:1px solid var(--border-strong);
+  border-radius:var(--radius-pill);padding:6px;cursor:pointer;font-family:inherit;
+  box-shadow:var(--shadow);transition:border-color .15s}
+.ld-search:hover{border-color:var(--text-3)}
+.ld-search-field{display:flex;flex-direction:column;justify-content:center;gap:3px;
+  flex:1;text-align:left;min-width:0;padding:8px 20px}
+.ld-search-field-sm{flex:0 0 auto}
+.ld-search-label{font-size:10.5px;color:var(--text-3);font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em}
+.ld-search-val{font-size:14.5px;font-weight:650;color:var(--text);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ld-search-div{width:1px;background:var(--border);margin:8px 0;flex:none}
+.ld-search-btn{flex:none;padding:0 26px;font-size:14px;border-radius:var(--radius-pill)}
 
-.ld-features{max-width:620px;margin:0 auto;padding:44px 18px 8px;
-  display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.ld-feature-icon{width:44px;height:44px;border-radius:12px;background:var(--surface-2);
-  border:1px solid var(--border);display:grid;place-items:center;color:var(--text);margin-bottom:12px}
-.ld-feature-title{font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
-.ld-feature-text{font-size:12.5px;color:var(--text-2);line-height:1.5;margin:0}
+.ld-check{display:flex;align-items:center;gap:9px;max-width:1040px;margin:16px auto 0;
+  padding:0 20px;font-size:13px;color:var(--text-2);font-weight:500;cursor:default}
+.ld-check input{width:16px;height:16px;accent-color:var(--text);margin:0}
 
-.ld-footer{max-width:620px;margin:0 auto;padding:36px 18px 44px}
+/* ---------- feature row ---------- */
+.ld-features{max-width:1040px;margin:0 auto;padding:52px 20px 8px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
+.ld-feature-icon{width:48px;height:48px;border-radius:50%;background:var(--surface-2);
+  border:1px solid var(--border);display:grid;place-items:center;color:var(--text);margin-bottom:14px}
+.ld-feature-title{font-family:'Poppins',var(--sans,inherit);font-size:16px;font-weight:700;
+  letter-spacing:-.01em;margin-bottom:7px}
+.ld-feature-text{font-size:13px;color:var(--text-2);line-height:1.55;margin:0}
 
+.ld-footer{max-width:520px;margin:20px auto 0;padding:36px 20px 48px;text-align:center}
+.ld-fine{color:var(--text-3);font-size:12px;margin:12px 0 0}
+
+@media(max-width:860px){
+  .ld-hero{grid-template-columns:1fr;gap:26px}
+  .ld-art{aspect-ratio:16/9}
+  .ld-h1{font-size:34px}
+}
 @media(max-width:640px){
-  .ld-search{flex-wrap:wrap;gap:12px}
+  .ld-nav-cta{display:none}
+  .ld-search{flex-wrap:wrap;border-radius:20px;gap:4px}
+  .ld-search-field{padding:10px 14px;flex:1 1 45%}
   .ld-search-div{display:none}
-  .ld-search-btn{width:100%;margin-left:0;text-align:center}
+  .ld-search-btn{width:100%;margin:6px 4px 2px;padding:13px;text-align:center;border-radius:12px}
 }
 @media(max-width:480px){
   .ld-h1{font-size:28px}
-  .ld-features{grid-template-columns:1fr;gap:26px}
-  .ld-art{max-height:230px}
+  .ld-features{grid-template-columns:1fr;gap:28px}
 }
 `;
