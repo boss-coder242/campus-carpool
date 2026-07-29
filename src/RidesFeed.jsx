@@ -15,9 +15,11 @@ export default function RidesFeed({ onOffer }) {
   const [joinedIds, setJoinedIds] = useState(new Set());
   const [isFemale, setIsFemale] = useState(false);
   const [femaleFilter, setFemaleFilter] = useState(false);
-  const [filter, setFilter] = useState({ from: "", to: "", date: "" });
+  const [filter, setFilter] = useState({ from: "", to: "", date: "", passengers: 1 });
   const [sort, setSort] = useState("soonest");
   const [viewUser, setViewUser] = useState(null);
+  // Rides offered are search-first: nothing shows until you hit Search.
+  const [searched, setSearched] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -137,7 +139,7 @@ export default function RidesFeed({ onOffer }) {
   }
 
   const q = (s) => s.trim().toLowerCase();
-  const activeFilters = filter.from || filter.to || filter.date || femaleFilter;
+  const activeFilters = filter.from || filter.to || filter.date || filter.passengers > 1 || femaleFilter;
 
   const SORTS = {
     soonest: (a, b) => (a.date + a.time).localeCompare(b.date + b.time),
@@ -151,6 +153,7 @@ export default function RidesFeed({ onOffer }) {
     if (filter.from && !r.from.toLowerCase().includes(q(filter.from))) return false;
     if (filter.to && !r.to.toLowerCase().includes(q(filter.to))) return false;
     if (filter.date && r.date !== filter.date) return false;
+    if (filter.passengers && r.seats_left < filter.passengers) return false;
     return true;
   }).sort(SORTS[sort]);
 
@@ -163,7 +166,11 @@ export default function RidesFeed({ onOffer }) {
 
   const showingRides = view === "rides";
   const count = showingRides ? shown.length : shownReqs.length;
-  const clearFilters = () => setFilter({ from: "", to: "", date: "" });
+  const showResults = showingRides ? searched : true;
+  const clearFilters = () => {
+    setFilter({ from: "", to: "", date: "", passengers: 1 });
+    setSearched(false);
+  };
 
   return (
     <div className="cc-page">
@@ -176,7 +183,9 @@ export default function RidesFeed({ onOffer }) {
         <div>
           <h1 className="cc-h1">{showingRides ? "Find a ride" : "Riders looking"}</h1>
           <p className="cc-sub">
-            {loading && showingRides ? "Loading…"
+            {showingRides && !searched
+              ? "Search a route to see who's driving."
+              : loading && showingRides ? "Loading…"
               : `${count} ${showingRides ? "ride" : "request"}${count === 1 ? "" : "s"} ${showingRides ? "available" : "open"}`}
           </p>
         </div>
@@ -205,24 +214,49 @@ export default function RidesFeed({ onOffer }) {
         <div className="rf-field">
           <span className="rf-pin from" />
           <input list="rf-locs" placeholder="Leaving from" value={filter.from}
-            onChange={(e) => setFilter({ ...filter, from: e.target.value })} />
+            onChange={(e) => setFilter({ ...filter, from: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && showingRides && setSearched(true)} />
         </div>
         <div className="rf-divider" />
         <div className="rf-field">
           <span className="rf-pin to" />
           <input list="rf-locs" placeholder="Going to" value={filter.to}
-            onChange={(e) => setFilter({ ...filter, to: e.target.value })} />
+            onChange={(e) => setFilter({ ...filter, to: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && showingRides && setSearched(true)} />
         </div>
         <div className="rf-divider" />
-        <div className="rf-field">
+        <div className="rf-field rf-field-sm">
+          <select value={filter.passengers}
+            onChange={(e) => setFilter({ ...filter, passengers: Number(e.target.value) })}>
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <option key={n} value={n}>{n} passenger{n > 1 ? "s" : ""}</option>
+            ))}
+          </select>
+        </div>
+        <div className="rf-divider" />
+        <div className="rf-field rf-field-sm">
           <input type="date" min={new Date().toISOString().slice(0, 10)} value={filter.date}
             onChange={(e) => setFilter({ ...filter, date: e.target.value })} />
-          {(filter.from || filter.to || filter.date) &&
-            <button className="rf-clear" onClick={clearFilters}>Clear</button>}
         </div>
       </div>
 
       {showingRides && (
+        <button className="cc-btn cc-btn-block rf-search-btn" onClick={() => setSearched(true)}>
+          Search rides
+        </button>
+      )}
+
+      {showingRides && searched && (
+        <div className="rf-recap">
+          <span className="cc-dim cc-small">
+            {filter.from || "Anywhere"} → {filter.to || "anywhere"}
+            {filter.date ? ` · ${fmtDate(filter.date)}` : ""} · {filter.passengers} passenger{filter.passengers > 1 ? "s" : ""}
+          </span>
+          <button className="rf-clear" onClick={clearFilters}>Edit search</button>
+        </div>
+      )}
+
+      {showingRides && searched && (
         <div className="rf-tools">
           {isFemale && (
             <button className={`rf-chip ${femaleFilter ? "on" : ""}`}
@@ -244,13 +278,13 @@ export default function RidesFeed({ onOffer }) {
 
       {message && <p className="cc-msg" role="status">{message}</p>}
 
-      {loading && showingRides && (
+      {loading && showingRides && searched && (
         <div className="rf-list">
           {[0, 1, 2].map((i) => <div key={i} className="rf-skeleton" />)}
         </div>
       )}
 
-      {!loading && count === 0 && (
+      {!loading && showResults && count === 0 && (
         <div className="cc-empty">
           <p>
             {activeFilters ? `No ${showingRides ? "rides" : "requests"} match your search.`
@@ -327,7 +361,7 @@ export default function RidesFeed({ onOffer }) {
       )}
 
       {/* ---------- rides ---------- */}
-      <ul className="rf-list" hidden={!showingRides}>
+      <ul className="rf-list" hidden={!showingRides || !searched}>
         {shown.map((r) => {
           const mine = r.driver?.id === userId;
           const joined = joinedIds.has(r.id);
@@ -424,12 +458,19 @@ const css = `
 .rf-search{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   overflow:hidden;margin-bottom:12px}
 .rf-field{display:flex;align-items:center;gap:10px;padding:4px 14px}
-.rf-field input{background:none;border:0;padding:13px 0;font-size:15px}
-.rf-field input:focus{box-shadow:none}
+.rf-field-sm{flex:0 0 auto}
+.rf-field input,.rf-field select{background:none;border:0;padding:13px 0;font-size:15px;
+  width:auto;color:var(--text);font-family:inherit;cursor:pointer}
+.rf-field input{width:100%;cursor:text}
+.rf-field input:focus,.rf-field select:focus{box-shadow:none}
 .rf-divider{height:1px;background:var(--border);margin-left:38px}
+.rf-field-sm + .rf-divider,.rf-field-sm ~ .rf-divider{margin-left:14px}
 .rf-pin{width:9px;height:9px;border-radius:50%;flex:none;border:2px solid var(--text-3)}
 .rf-pin.from{background:var(--text-3);border-color:var(--text-3)}
 .rf-pin.to{border-color:var(--green);background:var(--green)}
+.rf-search-btn{margin:12px 0 0}
+.rf-recap{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:14px 0 4px;flex-wrap:wrap}
 .rf-clear{background:none;border:0;color:var(--text-2);font-size:13px;font-family:inherit;
   cursor:pointer;padding:6px 2px;text-decoration:underline;text-underline-offset:3px;flex:none}
 .rf-clear:hover{color:var(--text)}
