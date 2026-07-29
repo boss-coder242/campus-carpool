@@ -1,3 +1,5 @@
+import heroPhoto from "./assets/hero-friends.png";
+
 /*
   Pre-login marketing splash — shown to signed-out visitors before the
   email step. Everything here is decorative: there is no data to search
@@ -56,23 +58,10 @@ export default function Landing({ onStart }) {
           <p className="ld-fine">Only @chitkara.edu.in emails can sign in.</p>
         </div>
 
-        <div className="ld-art" aria-hidden="true">
-          <div className="ld-art-glow" />
-          <div className="ld-art-card">
-            <div className="ld-art-row">
-              <span className="ld-art-dot" />
-              <div className="ld-art-lines"><span /><span className="short" /></div>
-            </div>
-            <div className="ld-art-track" />
-            <div className="ld-art-row">
-              <span className="ld-art-dot end" />
-              <div className="ld-art-lines"><span /><span className="short" /></div>
-            </div>
-            <div className="ld-art-foot">
-              <span className="ld-art-avatar" />
-              <span className="ld-art-lines"><span className="short" /></span>
-              <span className="ld-art-pill" />
-            </div>
+        <div className="ld-art">
+          <img className="ld-photo" src={heroPhoto} alt="Students sharing a ride together, laughing in the car" />
+          <div className="ld-photo-tag">
+            <span className="ld-photo-logo">⇄</span> Campus Carpool
           </div>
         </div>
       </section>
@@ -130,25 +119,16 @@ const css = `
 .ld-cta-row{margin-top:22px}
 .ld-fine{color:var(--text-3);font-size:12px;margin:10px 0 0}
 
-/* decorative route-card illustration */
-.ld-art{position:relative;height:210px;display:flex;align-items:center;justify-content:center}
-.ld-art-glow{position:absolute;width:230px;height:230px;border-radius:50%;
-  background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);filter:blur(2px)}
-.ld-art-card{position:relative;width:100%;max-width:320px;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
-.ld-art-row{display:flex;align-items:center;gap:12px}
-.ld-art-dot{width:9px;height:9px;border-radius:50%;background:var(--text);flex:none}
-.ld-art-dot.end{background:var(--green)}
-.ld-art-track{width:2px;height:20px;margin:2px 0 2px 4px;
-  background:repeating-linear-gradient(to bottom,var(--border-strong) 0 4px,transparent 4px 8px)}
-.ld-art-lines{display:flex;flex-direction:column;gap:6px;flex:1}
-.ld-art-lines span{display:block;height:8px;border-radius:4px;background:var(--surface-3);width:100%}
-.ld-art-lines span.short{width:55%}
-.ld-art-foot{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;
-  border-top:1px solid var(--border)}
-.ld-art-avatar{width:26px;height:26px;border-radius:50%;background:var(--surface-3);flex:none}
-.ld-art-foot .ld-art-lines{flex:1}
-.ld-art-pill{width:52px;height:22px;border-radius:var(--radius-pill);background:var(--text);flex:none}
+/* hero photo */
+.ld-art{position:relative;border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--border);box-shadow:var(--shadow);max-height:340px}
+.ld-photo{display:block;width:100%;height:100%;max-height:340px;object-fit:cover}
+.ld-photo-tag{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:8px;
+  background:rgba(10,10,11,.72);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);
+  color:var(--text);font-size:12.5px;font-weight:700;padding:7px 13px 7px 9px;
+  border-radius:var(--radius-pill)}
+.ld-photo-logo{background:var(--text);color:var(--bg);border-radius:7px;width:20px;height:20px;
+  display:grid;place-items:center;font-size:12px;font-weight:800;flex:none}
 
 /* decorative search bar */
 .ld-search{display:flex;align-items:center;gap:0;max-width:620px;margin:28px auto 0;
@@ -182,6 +162,6 @@ const css = `
 @media(max-width:480px){
   .ld-h1{font-size:28px}
   .ld-features{grid-template-columns:1fr;gap:26px}
-  .ld-art{height:190px}
+  .ld-art{max-height:230px}
 }
 `;
