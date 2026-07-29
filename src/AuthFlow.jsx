@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase, isAllowedEmail, ALLOWED_DOMAIN } from "./supabaseClient";
+import Landing from "./Landing";
 
 /*
-  Carpool auth flow — 3 waypoints:
-  email → verify OTP → profile setup
+  Carpool auth flow — landing → email → verify OTP → profile setup
   Renders children (the app) once the profile is complete.
 */
 
@@ -17,7 +17,7 @@ const GENDERS = [
 ];
 
 export default function AuthFlow({ children }) {
-  const [step, setStep] = useState("loading"); // loading | email | otp | profile | done
+  const [step, setStep] = useState("loading"); // loading | landing | email | otp | profile | done
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -31,7 +31,7 @@ export default function AuthFlow({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      data.session ? checkProfile(data.session.user.id) : setStep("email");
+      data.session ? checkProfile(data.session.user.id) : setStep("landing");
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
@@ -138,6 +138,7 @@ export default function AuthFlow({ children }) {
 
   if (step === "done") return children ?? <div className="cp-shell"><p>You're in. 🚗</p></div>;
   if (step === "loading") return <div className="cp-shell" />;
+  if (step === "landing") return <Landing onStart={() => setStep("email")} />;
 
   const waypoint = step === "email" ? 0 : step === "otp" ? 1 : 2;
 
@@ -145,9 +146,16 @@ export default function AuthFlow({ children }) {
     <div className="cp-shell">
       <style>{css}</style>
       <div className="cp-card">
-        <div className="cp-brand">
-          <span className="cp-logo">⇄</span>
-          <span>Campus Carpool</span>
+        <div className="cp-brand-row">
+          <div className="cp-brand">
+            <span className="cp-logo">⇄</span>
+            <span>Campus Carpool</span>
+          </div>
+          {step === "email" && (
+            <button className="cp-back" onClick={() => setStep("landing")} aria-label="Back">
+              ← Back
+            </button>
+          )}
         </div>
 
         {/* route-line progress */}
@@ -266,8 +274,11 @@ const css = `
   border-radius:20px;padding:32px 28px;box-shadow:var(--shadow);animation:cpIn .25s ease}
 @keyframes cpIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-.cp-brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:16px;
-  letter-spacing:-.02em;margin-bottom:28px}
+.cp-brand-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.cp-brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:16px;letter-spacing:-.02em}
+.cp-back{background:none;border:0;color:var(--text-2);font-size:12.5px;font-weight:600;
+  font-family:inherit;cursor:pointer;padding:0}
+.cp-back:hover{color:var(--text)}
 .cp-logo{background:var(--text);color:var(--bg);border-radius:10px;width:32px;height:32px;
   display:grid;place-items:center;font-size:17px;font-weight:800}
 

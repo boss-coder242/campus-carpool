@@ -100,7 +100,8 @@ reports           id, reporter_id, reported_id, reason, ride_id, created_at
 ```
 src/
   supabaseClient.js   Supabase client + isAllowedEmail() + ALLOWED_DOMAIN
-  AuthFlow.jsx        3-step auth gate, wraps the app
+  Landing.jsx         pre-login marketing splash — decorative, all CTAs lead into AuthFlow
+  AuthFlow.jsx        landing + 3-step auth gate, wraps the app
   App.jsx             <AuthFlow><Shell/></AuthFlow> — bottom tab-bar shell
   RidesFeed.jsx       browse open rides, search/filter, join/leave (Rides tab)
   UserProfile.jsx     tappable public profile modal (reads public_profiles only)
